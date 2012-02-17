@@ -1,0 +1,20 @@
+Degeneratedlabs build system
+----------------------------
+
+This is an automated build system based on qemu images (thanks to aurel32,
+Aurélien Jarno for the images) for Degeneratedlabs's Live Cds and for
+aircrack-ng unoficial packages currently keep at http://repo.degeneratedlabs.net
+
+How to use it
+-------------
+
+You usually don't need to, we do it for you, building weekly images that are shared via
+bittorrent (seed us! [0])
+
+But, if you want to do it anyway, this is intended to be almost automated.
+You just download this repo, execute build_system_builder.sh (wich will prompt you to
+copypaste some stuff on the debian images) and wait.
+For custom builds you'd have to adjust the urls to point to your own repo (fork us!)
+
+All the needed changes are made in the repo, not the build system (as it has to be)
+
