@@ -18,3 +18,10 @@ For custom builds you'd have to adjust the urls to point to your own repo (fork 
 
 All the needed changes are made in the repo, not the build system (as it has to be)
 
+Oh, and you'll need to setup... networking
+
+Networking
+------------
+The script uses a specific IP address for the bridge, it's easy enough to change it, But
+you can also just configure it as it is, copying the contents of doc/examples/networking 
+to your /etc/network/interfaces file and restarting networking.

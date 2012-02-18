@@ -1,0 +1,11 @@
+# You need to have installed
+# bridge-utils and uml-utils
+# also, tun module has to be loaded
+auto br0
+iface br0 inet dhcp
+    pre-up /usr/sbin/tunctl -u <username> -t tap0
+    pre-up ifconfig tap0 up
+    bridge_ports all tap0
+    post-down ifconfig tap0 down
+    post-down tunctl -d tap0
+

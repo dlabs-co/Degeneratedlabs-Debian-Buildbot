@@ -4,6 +4,8 @@
 # Degeneratedlabs initscript
 # Each time you launch the virtual machine it will recreate the debian packages and dlive
 
+install_tools(){ apt-get install devscripts dh_make debhelper live-build live-config live-tools; }
+
 cleanup(){ (( $(ls -l|wc -l) > 3 )) && rm -rf /root/*; }
 mkdirs(){ mkdir -p /root/dlabs; cd /root/dlabs; cleanup; }
 
@@ -40,9 +42,12 @@ upload_live(){
 }
 
 cleanup
+install_tools
+
 get_aircrackng
 get_debian
 build_package
 upload_package
+
 build_live
 upload_live

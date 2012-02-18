@@ -1,22 +1,29 @@
 #!/bin/bash
+apt-get install qemu qemu-tools nbd-client wget 
 declare -a arch_qemu
 version="squeeze"
 archs=("i386", "amd64")
 arch_qemu=( [i386]=i386 [amd64]=x86_64 )
 script_url="https://raw.github.com/degeneratedlabs/Degeneratedlabs-Debian-Buildbot/master/initscript.sh"
 cleanup(){ (( $(ls -l|wc -l) > 3 )) && rm -rf /root/*; }
-chdir_(){ rm -rf /root/`date +%M-%D`/; mkdir -p /root/`date +%M-%D`/logs; cd /root/`date +%M-%D`/; }
+chdir_(){ rm -rf /root/`date +%M-%D`/; mkdir -p /root/images/current /root/`date +%M-%D`/logs; cd /root/`date +%M-%D`/; }
 launch_qemu(){ arch=$1; shift; qemu-${arch_qemu[$arch]} $@ images/debian_${version}_${arch}_standard.qcow2; }
 build_package_and_iso(){ launch_qemu $1 "--no-graphic" ; }
 prepare_image(){ 
     log="logs/debian-download-${1}_${version}-`date +%M-%D_%m-%d`"
     image_url="http://people.debian.org/~aurel32/qemu/$1/debian_${version}_${arch}_standard.qcow2"
     [[ ! -f images/debian_${version}_${1}_standard.qcow2 ]] && { 
-	    wget $image_url -O images/debian_${version}_${1}_standard.qcow2 &> $log && {
-            echo "Paste this on qemu's console. User root password root:"
-            echo "wget --no-check-certificate \"$script_url\" -O /etc/init.d/dlabs_builder;"
-            echo "chmod +x /etc/init.d/dlabs_builder; update-rc.d dlabs_builder default; halt;"
-            read && launch_qemu $1 "--curses"; return
+	    wget $image_url -O images/debian_${version}_${1}_standard.qcow2 &>> $log && {
+            {
+                qemu-nbd images/debian_${version}_${1}_standard.qcow2 &>> $log
+                nbd-client localhost 10809 /dev/nbd0
+                mount /dev/nbd0p1 -oloop /root/images/current
+                wget --no-check-certificate \"$script_url\" -O /root/images/current/etc/rc.local
+                chmod +x /root/images/current/etc/rc.local
+                umount /root/images/current
+                nbd-client -d /dev/nbd0
+            } &&
+            launch_qemu $1 "--curses"; return
         }
     }
 }
