@@ -1,36 +1,75 @@
 #!/bin/bash
-apt-get install qemu qemu-tools nbd-client wget 
+
 declare -a arch_qemu
-version="squeeze"
-archs=("i386", "amd64")
-arch_qemu=( [i386]=i386 [amd64]=x86_64 )
-script_url="https://raw.github.com/degeneratedlabs/Degeneratedlabs-Debian-Buildbot/master/initscript.sh"
-cleanup(){ (( $(ls -l|wc -l) > 3 )) && rm -rf /root/*; }
-chdir_(){ rm -rf /root/`date +%M-%D`/; mkdir -p /root/images/current /root/`date +%M-%D`/logs; cd /root/`date +%M-%D`/; }
-launch_qemu(){ arch=$1; shift; qemu-${arch_qemu[$arch]} $@ images/debian_${version}_${arch}_standard.qcow2; }
-build_package_and_iso(){ launch_qemu $1 "--no-graphic" ; }
-prepare_image(){ 
-    log="logs/debian-download-${1}_${version}-`date +%M-%D_%m-%d`"
-    image_url="http://people.debian.org/~aurel32/qemu/$1/debian_${version}_${arch}_standard.qcow2"
-    [[ ! -f images/debian_${version}_${1}_standard.qcow2 ]] && { 
-	    wget $image_url -O images/debian_${version}_${1}_standard.qcow2 &>> $log && {
-            {
-                qemu-nbd images/debian_${version}_${1}_standard.qcow2 &>> $log
-                nbd-client localhost 10809 /dev/nbd0
-                mount /dev/nbd0p1 -oloop /root/images/current
-                wget --no-check-certificate \"$script_url\" -O /root/images/current/etc/rc.local
-                chmod +x /root/images/current/etc/rc.local
-                umount /root/images/current
-                nbd-client -d /dev/nbd0
-            } &&
-            launch_qemu $1 "--curses"; return
-        }
-    }
+archs=("i386" "amd64")
+base_dir="/root";
+
+help_(){
+    echo "Usage: $0 [-c] [-f] [-a ARCHS] [-b BASE_DIR ]"
+    echo -e "\t -c\t Cleans up directory"
+    echo -e "\t -f\t Forces script installation. Do it if something failed installing the script previously"
+    echo -e "\t -a\t Specifi the architectures to build for." 
+    echo -e "\t -b\t where to start building the images, default is /root"
+    exit
 }
 
-cleanup; chdir_
-#This happens just the first time you have a new arch ;)
-for arch in $archs; do prepare_image $arch; done # Get all qemu images and install the initscript on them. #
+while getopts "b:a:fhc" opt; do
+      case $opt in
+              c) export cleanup=1 ;;
+              f) export force=1 ;;
+              b) export base_dir=$OPTARG;;
+              a) export archs=( $OPTARG );;
+              h) help_;;
+      esac
+done
 
+info_(){
+    echo -e "\t - $@"; 
+}
+
+echo "Starting build"
+
+dir="$base_dir/`date +%m-%d`/"
+logdir="$dir/logs/"
+version="squeeze"
+arch_qemu=( [i386]=i386 [amd64]=x86_64 )
+script_url="https://raw.github.com/degeneratedlabs/Degeneratedlabs-Debian-Buildbot/master/initscript.sh"
+
+cleanup(){ (( $(ls -l|wc -l) > 3 )) && rm -rf $dir; mkdir -p $dir/logs $dir/../images/current; cd $dir; }
+launch_qemu(){ arch=$1; shift; qemu-system-${arch_qemu[$arch]} $@ $dir/../images/debian_${version}_${arch}_standard.qcow2; }
+build_package_and_iso(){ launch_qemu $1 ; }
+
+prepare_image(){ 
+    image_url="http://people.debian.org/~aurel32/qemu/$1/debian_${version}_${1}_standard.qcow2" 
+    [[ ! -f $dir/../images/debian_${version}_${1}_standard.qcow2 ]] && { 
+	    wget $image_url -O $dir/../images/debian_${version}_${1}_standard.qcow2 &> $logdir/download  &&
+        {
+            install_script $@
+            return
+        }
+    }
+    [[ $force ]] && install_script  $@
+}
+
+install_script(){
+    info_ "Mounting image" 
+    qemu-nbd --connect=/dev/nbd0 /root/images/debian_${version}_${1}_standard.qcow2 & sleep 10 &&
+    mount /dev/nbd0p1 /root/images/current
+    info_ "Downloading script into image"
+    wget --no-check-certificate $script_url -O /root/images/current/etc/rc.local
+    chmod +x /root/images/current/etc/rc.local
+    info_ "Umounting image"
+    umount /root/images/current
+    nbd-client -d /dev/nbd0
+}
+
+
+echo "Installing script deps, wait"; apt-get -y install qemu qemu-utils nbd-client wget &>$dir/logs/startup
+[[ $cleanup ]] && cleanup;
+
+#This happens just the first time you have a new arch ;)
+for arch in $archs; do prepare_image $arch $@; done # Get all qemu images and install the initscript on them. #
 # Dangerous: make sure to not build it for more than two archs as a time if you don't have a huge computer
 for arch in $archs; do build_package_and_iso $arch & done # Build packages and isos in parallel.
+
+
