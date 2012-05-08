@@ -1,7 +1,7 @@
 #!/bin/bash
 
 declare -a arch_qemu
-archs=("i386" "amd64")
+archs=("i386") #  "amd64") Diable amd64, only i386 images will be built by default
 base_dir="/root";
 
 help_(){
@@ -31,18 +31,20 @@ echo "Starting build"
 
 dir="$base_dir/`date +%m-%d`/"
 logdir="$dir/logs/"
-version="squeeze"
+version="sid"
 arch_qemu=( [i386]=i386 [amd64]=x86_64 )
 script_url="https://raw.github.com/degeneratedlabs/Degeneratedlabs-Debian-Buildbot/master/initscript.sh"
 
 cleanup(){ (( $(ls -l|wc -l) > 3 )) && rm -rf $dir; mkdir -p $dir/logs $dir/../images/current; cd $dir; }
-launch_qemu(){ arch=$1; shift; qemu-system-${arch_qemu[$arch]} $@ $dir/../images/debian_${version}_${arch}_standard.qcow2; }
+launch_qemu(){ arch=$1; shift; kvm -m 2047 $@ -boot c  -hda $dir/../images/debian_${version}_${arch}_standard.qcow2; }
 build_package_and_iso(){ launch_qemu $1 ; }
 
 prepare_image(){ 
-    image_url="http://people.debian.org/~aurel32/qemu/$1/debian_${version}_${1}_standard.qcow2" 
+    image_url="/root/static_images/${version}_${1}.qcow2"
+#    image_url="http://people.debian.org/~aurel32/qemu/$1/debian_${version}_${1}_standard.qcow2" 
     [[ ! -f $dir/../images/debian_${version}_${1}_standard.qcow2 ]] && { 
-	    wget $image_url -O $dir/../images/debian_${version}_${1}_standard.qcow2 &> $logdir/download  &&
+#	    wget $image_url -O $dir/../images/debian_${version}_${1}_standard.qcow2 &> $logdir/download  &&
+        cp $image_url $dir/../images/debian_${version}_${1}_standard.qcow2 &&
         {
             install_script $@
             return
